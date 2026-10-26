@@ -44,13 +44,22 @@ No global keyboard-hook dependency is used.
    overlay. As in the original implementation, the camera stage precedes the
    click-triggered animation. Camera failure also proceeds to this click stage.
 4. After the original one-second trigger delay, the BSOD animation and sounds play.
-5. The final `bsod16.png` remains visible with **Press ESC to exit** until you exit.
+5. The original final `bsod16.png` appears by itself. A cancellable callback
+   scheduled for **3,000 milliseconds** later adds **Press ESC to exit**.
+   The final image and message then remain visible until you exit.
 
 **Press Esc while either application window has focus to close the entire
 simulation**, including during the preview, the click-wait stage, and the animation.
-Alt+F4 and normal Windows security/exit controls remain available; there is no
-system-wide keyboard blocking. Before the overlay appears, the app is hidden
-during the short preparation delay, so it cannot receive Esc until a window has focus.
+Esc works before the hint appears as well. Alt+Tab, Alt+F4, Ctrl+Alt+Delete,
+and normal Windows security/exit controls remain available; there is no
+system-wide keyboard blocking. `block_all_keys(window)` ignores ordinary key
+presses and releases only within the Tk fullscreen window and its children.
+Modifier combinations and native system-key handling pass through, while Esc
+retains its dedicated exit binding. The OpenCV preview retains its existing Esc
+handling. No global hooks or input grabs are
+installed, and destroying the Tk window removes its local keyboard bindings.
+Before the overlay appears, the app is hidden during the short preparation delay,
+so it cannot receive Esc until a window has focus.
 
 The original image order and requested delays are retained:
 
@@ -90,7 +99,8 @@ fake-bsod-simulator/
 ├── tests/
 │   ├── test_resources.py
 │   ├── test_animation.py
-│   └── test_camera.py
+│   ├── test_camera.py
+│   └── test_keyboard.py
 ├── README.md
 └── requirements.txt
 ```
@@ -105,8 +115,9 @@ can be launched from another working directory using an absolute path to
 `src/main.py`; `python -m src.main` also works from the repository root.
 The desktop screenshot now stays in memory instead of writing `desktop.png`.
 
-Exit cancels pending application callbacks, stops sound playback, destroys the
-Tk window, and signals the camera worker to stop. Camera cleanup releases its
+Exit cancels pending application callbacks, including the delayed exit hint,
+stops sound playback, destroys the Tk window, and signals the camera worker to
+stop. Camera cleanup releases its
 capture handle and closes its own OpenCV window on normal exit, window close,
 disconnection, and handled OpenCV errors. Missing image or sound files produce
 a path-specific error before entering fullscreen. Rendering/playback failures
@@ -133,8 +144,10 @@ git diff --check
 The tests use Python's standard-library `unittest` runner and mocks; no third-party
 packages are needed to run them. They cover source layout, both import modes,
 all 21 asset hashes, working-directory-independent paths, frame/sound order and
-requested delays, startup/camera handoff, final-frame holding, Esc, timer cleanup,
-camera cleanup and detection behavior, and missing/unavailable resources.
+requested delays, startup/camera handoff, final-frame holding, the 3,000 ms hint
+delay and early cancellation, window-local keyboard filtering and system-key
+pass-through, Esc, timer cleanup, camera cleanup and detection behavior, and
+missing/unavailable resources.
 
 All desktop, GUI, audio, and webcam boundaries are mocked. Automated tests never
 launch the fullscreen simulation, capture real webcam frames, play sounds, send
