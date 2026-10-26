@@ -20,6 +20,33 @@ SOUND_DIR = PROJECT_DIR / "assets" / "sounds"
 SOUNDS = ("noise1.wav", "noise2.wav", "noise3.wav", "loop.wav", "sound1.wav")
 
 
+def block_all_keys(window):
+    """Suppress ordinary Tk keys only in this toplevel and its child widgets.
+
+    Leave modified keys and native system-key handling to Tk/Windows. Never
+    replace Tk's global bindings, grab input, or install an OS keyboard hook.
+    Destroying the owned window also removes these local bindings.
+    """
+    def suppress(event):
+        if event.keysym in {
+            "Escape", "F10", "Alt_L", "Alt_R", "Control_L", "Control_R",
+            "Shift_L", "Shift_R", "Win_L", "Win_R", "Super_L", "Super_R",
+            "Meta_L", "Meta_R",
+        }:
+            return None
+        return "break"
+
+    def allow(event):
+        return None
+
+    for kind in ("KeyPress", "KeyRelease"):
+        window.bind(f"<{kind}>", suppress)
+        # Specific modifier patterns take precedence over the generic filter.
+        # In particular, Alt events must reach Tk's native Windows handlers.
+        for modifier in ("Control", "Alt", "Meta", "Mod4"):
+            window.bind(f"<{modifier}-{kind}>", allow)
+
+
 def animation():
     """Yield (image, delay in ms, sound) in the original Main.py order.
 
@@ -55,6 +82,7 @@ class Simulator:
         self.camera = None
         self.stop_camera = threading.Event()
         self.camera_exit = threading.Event()
+        block_all_keys(self.root)
         self.root.bind("<Escape>", self.close)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
 
