@@ -180,13 +180,16 @@ class Simulator:
         if number is not None:
             self.updateImg(number)
         if delay is None:
-            self.exit_hint = tk.Label(
-                self.root, text="Press ESC to exit", font=("Arial", 18),
-                fg="white", bg="black", padx=12, pady=6,
-            )
-            self.exit_hint.place(relx=0.5, rely=0.95, anchor="s")
+            self.schedule(3000, self.show_exit_hint)
         else:
             self.schedule(delay, self.advance)
+
+    def show_exit_hint(self):
+        self.exit_hint = tk.Label(
+            self.root, text="Press ESC to exit", font=("Arial", 18),
+            fg="white", bg="black", padx=12, pady=6,
+        )
+        self.exit_hint.place(relx=0.5, rely=0.95, anchor="s")
 
     def close(self, event=None):
         if self.closed:

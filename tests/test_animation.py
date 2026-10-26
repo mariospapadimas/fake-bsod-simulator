@@ -14,15 +14,19 @@ class EventLoop:
         self.bindings = {}
         self.destroyed = False
         self.serial = 0
+        self.time = 0
+        self.due = {}
 
     def after(self, delay, callback):
         self.serial += 1
         self.jobs[self.serial] = callback
+        self.due[self.serial] = self.time + delay
         self.delays.append(delay)
         return self.serial
 
     def after_cancel(self, job):
         del self.jobs[job]
+        del self.due[job]
 
     def bind(self, key, callback):
         self.bindings[key] = callback
@@ -34,8 +38,15 @@ class EventLoop:
         self.destroyed = True
 
     def step(self):
-        job = next(iter(self.jobs))
+        job = min(self.jobs, key=self.due.__getitem__)
+        self.time = self.due.pop(job)
         self.jobs.pop(job)()
+
+    def advance(self, milliseconds):
+        target = self.time + milliseconds
+        while self.jobs and min(self.due.values()) <= target:
+            self.step()
+        self.time = target
 
     def drain(self):
         for _ in range(500):
@@ -81,7 +92,7 @@ class AnimationTests(unittest.TestCase):
         self.assertEqual([n for n in self.root.delays if n],
                          [1000, 2000, 3000, 3000, 100, 100, 2000, 500, 1000,
                           500, 7000, 100, 400, 500, 6000, 10] + [1, 1] * 20
-                         + [3000, 1000, 3000])
+                         + [3000, 1000, 3000, 3000])  # final timer reveals the hint
 
     def test_final_frame_stays_without_pending_animation_timer(self):
         self.app.initiate()
@@ -169,6 +180,55 @@ class AnimationTests(unittest.TestCase):
         self.root.bindings["<Escape>"](None)
         self.assertTrue(self.root.destroyed)
         self.assertFalse(self.root.jobs)
+
+    def advance_to_final_frame(self):
+        self.app.initiate()
+        while self.shown[-1:] != [16]:
+            self.root.step()
+
+    def test_final_frame_precedes_hint_by_exactly_3000_milliseconds(self):
+        self.advance_to_final_frame()
+        self.assertEqual(self.shown[-1], 16)
+        self.main.tk.Label.assert_not_called()
+        self.assertEqual(self.root.delays[-1], 3000)
+        self.assertEqual(len(self.root.jobs), 1)
+        self.assertEqual(self.app.timers, set(self.root.jobs))
+        self.root.advance(2999)
+        self.main.tk.Label.assert_not_called()
+        self.assertFalse(self.root.destroyed)
+        self.root.advance(1)
+        self.main.tk.Label.assert_called_once_with(
+            self.root, text="Press ESC to exit", font=("Arial", 18),
+            fg="white", bg="black", padx=12, pady=6)
+        self.assertFalse(self.root.jobs)
+        self.assertFalse(self.app.timers)
+        # Nothing replaces the final image or closes the application afterward.
+        frames = list(self.shown)
+        self.root.advance(60000)
+        self.assertEqual(self.shown, frames)
+        self.assertFalse(self.root.destroyed)
+
+    def test_escape_before_hint_cancels_callback_and_cleans_up(self):
+        self.advance_to_final_frame()
+        self.assertTrue(self.root.jobs)
+        self.root.advance(2999)
+        self.root.bindings["<Escape>"](None)
+        self.assertTrue(self.root.destroyed)
+        self.assertFalse(self.root.jobs)
+        self.assertFalse(self.app.timers)
+        self.assertTrue(self.app.stop_camera.is_set())
+        self.main.winsound.PlaySound.assert_called_with(None, 0)
+        self.root.advance(60000)
+        self.main.tk.Label.assert_not_called()
+
+    def test_window_close_also_cancels_pending_hint(self):
+        self.advance_to_final_frame()
+        self.assertTrue(self.root.jobs)
+        self.root.bindings["WM_DELETE_WINDOW"]()
+        self.root.advance(3000)
+        self.main.tk.Label.assert_not_called()
+        self.assertTrue(self.root.destroyed)
+        self.assertFalse(self.app.timers)
 
     def test_image_loading_uses_absolute_path_and_original_screen_size(self):
         self.root.winfo_screenwidth = lambda: 1920
