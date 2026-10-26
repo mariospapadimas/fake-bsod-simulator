@@ -78,6 +78,9 @@ delays, not guarantees of exact physical display timing.
 
 ```text
 fake-bsod-simulator/
+├── .github/
+│   └── workflows/
+│       └── python-tests.yml # Headless Python 3.11 CI
 ├── src/
 │   ├── main.py
 │   └── face_detection.py
@@ -137,6 +140,26 @@ All desktop, GUI, audio, and webcam boundaries are mocked. Automated tests never
 launch the fullscreen simulation, capture real webcam frames, play sounds, send
 real hotkeys, or alter host settings. These checks do not constitute real-hardware
 or live visual testing.
+
+## GitHub Actions
+
+[Python tests](https://github.com/mariospapadimas/fake-bsod-simulator/actions/workflows/python-tests.yml)
+runs on pushes to every branch and pull requests targeting `main`.
+The workflow in `.github/workflows/python-tests.yml` uses one Ubuntu job with
+Python 3.11, official actions pinned to verified commit SHAs, and
+`permissions: contents: read`.
+
+It discovers and runs the complete `unittest` suite described above, failing on
+test failures, no discovered tests, or no executed tests. Full Git history is
+checked out so the original asset-hash comparison can run. The tests require
+only the Python standard library and Git, so CI installs no third-party runtime
+packages. GUI, desktop input, webcam, and audio interactions are mocked throughout;
+the workflow never launches the actual BSOD application.
+
+Run the same tests locally with `python -m unittest discover -s tests -v` from
+the repository root. CI adds the empty-suite/execution guards to this discovery
+and test run. Its result verifies mocked behavior, not physical webcam, sound,
+Windows focus, or fullscreen rendering.
 
 ## Use and asset rights
 
