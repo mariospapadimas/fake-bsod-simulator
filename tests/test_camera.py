@@ -26,7 +26,8 @@ class CameraTests(unittest.TestCase):
         self.exit = threading.Event()
 
     def run_camera(self):
-        with patch.dict("sys.modules", {"cv2": self.cv, "numpy": self.np}), patch("sys.stderr"):
+        with patch.dict("sys.modules", {"cv2": self.cv, "numpy": self.np}), \
+                patch("sys.stderr"), patch("sys.stdout"):
             self.camera_module.open_user_camera(stop_event=self.stop, exit_event=self.exit)
 
     def test_accepts_cancellable_lifecycle(self):
@@ -93,6 +94,28 @@ class CameraTests(unittest.TestCase):
         self.run_camera()
         self.capture.release.assert_called_once()
         self.assertFalse(self.exit.is_set())
+
+    def test_stop_during_capture_releases_device_and_window(self):
+        def stop_after_frame():
+            self.stop.set()
+            return True, self.frame
+        self.capture.read.side_effect = stop_after_frame
+        self.run_camera()
+        self.capture.read.assert_called_once()
+        self.capture.release.assert_called_once()
+        self.cv.destroyWindow.assert_called_once_with("Face Detector Hack")
+
+    def test_letterboxes_wide_camera_frames_without_stretching(self):
+        self.frame.shape = (720, 1280, 3)
+        self.run_camera()
+        self.cv.resize.assert_called_once_with(self.frame, (800, 450))
+        self.np.zeros.assert_called_once_with((600, 800, 3), dtype=self.np.uint8)
+
+    def test_rendering_error_still_releases_camera(self):
+        self.cv.imshow.side_effect = self.cv.error("preview unavailable")
+        self.run_camera()
+        self.capture.release.assert_called_once()
+        self.cv.destroyWindow.assert_called_once_with("Face Detector Hack")
 
 
 if __name__ == "__main__":

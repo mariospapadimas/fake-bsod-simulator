@@ -20,6 +20,7 @@ def load_main():
         "tkinter", "PIL", "PIL.Image", "PIL.ImageTk", "pyautogui",
         "winsound", "keyboard", "cv2", "numpy",
     )}
+    modules["tkinter"].TclError = type("TclError", (Exception,), {})
     with patch.dict(sys.modules, modules):
         sys.modules.pop("src.main", None)
         return importlib.import_module("src.main"), modules
@@ -63,6 +64,15 @@ class ResourceTests(unittest.TestCase):
                 self.assertTrue((main.IMAGE_DIR / "bsod16.png").is_file())
             finally:
                 os.chdir(previous)
+
+    def test_script_style_import_uses_relocated_camera_module(self):
+        import runpy
+        _, modules = load_main()
+        with patch.dict(sys.modules, modules), patch.object(
+                sys, "path", [str(ROOT / "src")] + sys.path):
+            namespace = runpy.run_path(str(ROOT / "src/main.py"), run_name="import_check")
+        self.assertTrue(callable(namespace["open_user_camera"]))
+        modules["tkinter"].Tk.assert_not_called()
 
 
 if __name__ == "__main__":

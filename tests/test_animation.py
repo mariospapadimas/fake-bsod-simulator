@@ -128,6 +128,71 @@ class AnimationTests(unittest.TestCase):
         self.app.poll_camera()
         self.assertTrue(self.root.destroyed)
 
+    def test_missing_sound_is_reported(self):
+        with patch.object(self.main, "SOUND_DIR", Path("missing-sounds")):
+            with self.assertRaisesRegex(FileNotFoundError, "noise1.wav"):
+                self.app.validate_assets()
+
+    def test_startup_delays_desktop_capture_and_camera_handoff(self):
+        for name in ("withdraw", "geometry", "winfo_screenwidth", "winfo_screenheight",
+                     "attributes", "deiconify", "focus_force"):
+            setattr(self.root, name, MagicMock())
+        with patch.object(self.main.threading, "Thread") as thread:
+            thread.return_value.is_alive.return_value = True
+            self.app.start()
+            self.assertEqual(self.root.delays, [3000])
+            self.main.pt.hotkey.assert_not_called()
+            self.root.step()
+            self.main.pt.hotkey.assert_called_once_with("win", "d")
+            self.main.pt.screenshot.assert_not_called()
+            self.assertEqual(self.root.delays[-1], 700)
+            self.root.step()
+            self.main.pt.screenshot.assert_called_once_with()
+            self.root.attributes.assert_any_call("-fullscreen", True)
+            thread.return_value.start.assert_called_once()
+            self.app.bgimage.bind.assert_not_called()
+            thread.return_value.is_alive.return_value = False
+            self.root.step()
+            self.app.bgimage.bind.assert_called_once_with("<Button-1>", self.app.initiate)
+
+    def test_escape_during_startup_cancels_desktop_reveal(self):
+        self.root.withdraw = MagicMock()
+        self.app.start()
+        self.root.bindings["<Escape>"](None)
+        self.root.drain()
+        self.main.pt.hotkey.assert_not_called()
+        self.main.pt.screenshot.assert_not_called()
+
+    def test_escape_after_final_frame(self):
+        self.app.initiate()
+        self.root.drain()
+        self.root.bindings["<Escape>"](None)
+        self.assertTrue(self.root.destroyed)
+        self.assertFalse(self.root.jobs)
+
+    def test_image_loading_uses_absolute_path_and_original_screen_size(self):
+        self.root.winfo_screenwidth = lambda: 1920
+        self.root.winfo_screenheight = lambda: 1080
+        # Invoke the real renderer, mocked only at the file/GUI boundaries.
+        self.main.Simulator.updateImg(self.app, 13)
+        self.main.Image.open.assert_called_once_with(self.main.IMAGE_DIR / "bsod13.png")
+        self.main.Image.open.return_value.__enter__.return_value.resize.assert_called_once_with(
+            (1920, 1080), self.main.Image.Resampling.LANCZOS)
+        self.app.bgimage.configure.assert_called_once()
+
+    def test_main_finally_cleans_up_when_mainloop_is_interrupted(self):
+        root = MagicMock()
+        root.mainloop.side_effect = KeyboardInterrupt
+        app = self.main.Simulator(root)
+        app.camera = MagicMock()
+        with patch.object(self.main.tk, "Tk", return_value=root), \
+                patch.object(self.main, "Simulator", return_value=app), \
+                self.assertRaises(KeyboardInterrupt):
+            self.main.main()
+        self.assertTrue(app.closed)
+        root.destroy.assert_called_once()
+        app.camera.join.assert_called_once_with(timeout=0.2)
+
 
 if __name__ == "__main__":
     unittest.main()
