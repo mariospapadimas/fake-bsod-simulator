@@ -87,7 +87,8 @@ class CameraTests(unittest.TestCase):
         self.stop.set()
         self.run_camera()
         self.capture.read.assert_not_called()
-        self.capture.release.assert_called_once()
+        self.cv.VideoCapture.assert_not_called()
+        self.cv.namedWindow.assert_not_called()
 
     def test_window_close_returns_without_exiting_simulator(self):
         self.cv.getWindowProperty.return_value = 0
@@ -104,6 +105,7 @@ class CameraTests(unittest.TestCase):
         self.capture.read.assert_called_once()
         self.capture.release.assert_called_once()
         self.cv.destroyWindow.assert_called_once_with("Face Detector Hack")
+        self.cv.imshow.assert_not_called()
 
     def test_letterboxes_wide_camera_frames_without_stretching(self):
         self.frame.shape = (720, 1280, 3)

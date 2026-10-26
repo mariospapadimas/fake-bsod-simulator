@@ -3,12 +3,15 @@
 import sys
 import threading
 
+
 def open_user_camera(*, stop_event=None, exit_event=None):
     # Εισαγωγή της βιβλιοθήκης OpenCV μέσα στη συνάρτηση
     import cv2
     import numpy as np
 
     stop_event = stop_event if stop_event is not None else threading.Event()
+    if stop_event.is_set():
+        return
     video_capture = None
     window_open = False
     # φορτώνει το έτοιμο μοντέλο αναγνώρισης προσώπου της OpenCV
@@ -87,6 +90,8 @@ def open_user_camera(*, stop_event=None, exit_event=None):
         while not stop_event.is_set():
             # Ανάγνωση του τρέχοντος frame από την κάμερα
             result, video_frame = video_capture.read()
+            if stop_event.is_set():
+                break
 
             # αν διαβάστηκε σωστά frame
             if result == 1:
