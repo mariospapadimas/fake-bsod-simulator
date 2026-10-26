@@ -1,108 +1,156 @@
-# BlueScreenOfDeath-Python
+# Fake BSOD Simulator
 
-A harmless Python prank application that simulates a fake Windows Blue Screen of Death (BSOD) experience using Python.
+A Windows prank application with the original fullscreen desktop overlay,
+multi-stage fake BSOD images, sound effects, and OpenCV face-detection preview.
+This maintenance refactor preserves the presentation and playful scare sequence
+while organizing the files and providing a responsive exit.
 
-The program creates a fullscreen overlay, plays sound effects, displays a sequence of custom BSOD images, and opens a webcam face-detection window for additional prank effects.
+Repository: <https://github.com/mariospapadimas/fake-bsod-simulator>
 
 <img width="850" height="601" alt="bsod11" src="https://github.com/user-attachments/assets/62af29df-5826-42df-af23-a06534435145" />
 
-## Features
+## Requirements and setup
 
-* Fake BSOD screen simulation
-* Fullscreen desktop overlay
-* Multiple image-based visual effects
-* Sound effects and audio sequences
-* Webcam face detection using OpenCV
-* Face highlighting after sustained detection
-* Keyboard blocking during the prank sequence
-* Multi-stage scare/troll animation
+- Windows with an interactive desktop and audio output (`winsound` is Windows-only).
+- Python 3.9+ with Tkinter installed; automated checks were run on Python 3.11.
+- A webcam for the original preview. An unavailable or disconnected camera is
+  reported in the terminal, and the BSOD presentation can still proceed.
+- Git for cloning and for the asset-preservation regression test.
 
-## Preview
+From a terminal:
 
-The application:
-
-1. Takes a screenshot of the current desktop.
-2. Displays it in a fullscreen window.
-3. Waits for user interaction.
-4. Starts a sequence of fake BSOD screens and sound effects.
-5. Opens a webcam window with face detection.
-6. Continues through multiple visual stages.
-
-## Requirements
-
-* Python 3.9+
-* Windows
-* A connected webcam
-
-### Python Libraries
-
-```bash
-pip install pyautogui pillow opencv-python numpy keyboard --upgrade
+```powershell
+git clone https://github.com/mariospapadimas/fake-bsod-simulator.git
+cd fake-bsod-simulator
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe src/main.py
 ```
 
-## Project Structure
+Runtime dependencies are PyAutoGUI, Pillow, OpenCV (`opencv-python`), and NumPy.
+Tkinter, threading, and winsound come with the standard Windows Python installation.
+No global keyboard-hook dependency is used.
+
+## Presentation and exit
+
+1. After the original three-second preparation delay, Win+D reveals the desktop.
+   After another 700 ms, a desktop screenshot becomes the fullscreen, topmost overlay.
+2. The topmost **Face Detector Hack** preview opens at 800x600. It retains the
+   original Haar cascade, detection parameters, aspect-ratio-preserving black
+   bars, red face boxes after 20 consecutive detected frames, and the
+   `Hahaha!!!` / `Bruh!!!` messages. Frames are previewed only; they are not recorded,
+   uploaded, or saved.
+3. Close the camera preview with its **X** button, then click the fullscreen
+   overlay. As in the original implementation, the camera stage precedes the
+   click-triggered animation. Camera failure also proceeds to this click stage.
+4. After the original one-second trigger delay, the BSOD animation and sounds play.
+5. The final `bsod16.png` remains visible with **Press ESC to exit** until you exit.
+
+**Press Esc while either application window has focus to close the entire
+simulation**, including during the preview, the click-wait stage, and the animation.
+Alt+F4 and normal Windows security/exit controls remain available; there is no
+system-wide keyboard blocking. Before the overlay appears, the app is hidden
+during the short preparation delay, so it cannot receive Esc until a window has focus.
+
+The original image order and requested delays are retained:
 
 ```text
-BlueScreenOfDeath-Python/
-│
-├── Main.py
-├── FaceRecognitionProjectForBsod.py
-│
-├── bsod1.png
-├── bsod2.png
-├── ...
-│
-├── noise1.wav
-├── noise2.wav
-├── noise3.wav
-├── loop.wav
-└── sound1.wav
+1 (2s), 2 (3s), 3 (3s), 4 (0.1s), 5 (0.1s), 7 (2s),
+6 (0.5s), 7 (1s), 12 (0.5s), 8 (7s), 10 (0.1s), 9 (0.4s),
+10 (0.5s), 11 (6s), 13 (0.01s),
+20 repetitions of [11 (0.001s), 13 (0.001s)],
+15 (3s), 14 (1s), 13 (3s), 16 (until exit)
 ```
 
-> `desktop.png` is generated at runtime (a screenshot of your desktop) and is not part of the repository.
+`noise1.wav`, `noise2.wav`, and `noise3.wav` precede images 1, 2, and 3;
+`loop.wav` starts at image 4; `sound1.wav` precedes the flash pairs.
+`noise1.wav` plays after each flash pair and before images 15, 14, and 13,
+including the original two adjacent triggers before image 15. Playback remains
+asynchronous and interrupting, as originally implemented; `loop.wav` is not
+made into a repeating audio loop.
 
-## How To Run
+Tk callbacks replace the blocking sleeps, including the extremely long final
+sleep. Image decoding, screen resizing, audio dispatch, and OS timer resolution
+still add overhead, especially to the original 1 ms flashes; these are requested
+delays, not guarantees of exact physical display timing.
 
-```bash
-python Main.py
+## Structure and resources
+
+```text
+fake-bsod-simulator/
+├── src/
+│   ├── main.py
+│   └── face_detection.py
+├── assets/
+│   ├── images/             # bsod1.png through bsod16.png
+│   └── sounds/             # noise1/2/3.wav, loop.wav, sound1.wav
+├── tests/
+│   ├── test_resources.py
+│   ├── test_animation.py
+│   └── test_camera.py
+├── README.md
+└── requirements.txt
 ```
 
-## ⚠️ How To Stop The Program
+All 16 original PNGs and five WAVs are moved byte-for-byte. The regression suite
+compares their SHA-256 hashes with Git revision
+`956bcad4f16eb10e871886f6aa579df51ea572f8`, the original main revision used for
+this refactor. No assets are regenerated or edited.
 
-Once the prank sequence starts (after you click the screen), the app tries to block `Ctrl`, `Alt`, `Win`, and `Delete` system-wide and keeps its window fullscreen and always-on-top. This means most of the usual escape routes are disabled:
+Asset paths use `pathlib.Path` relative to the source location. The application
+can be launched from another working directory using an absolute path to
+`src/main.py`; `python -m src.main` also works from the repository root.
+The desktop screenshot now stays in memory instead of writing `desktop.png`.
 
-* `Ctrl+Shift+Esc` (Task Manager) — blocked
-* `Alt+F4` — blocked
-* `Win+D` / Start menu — blocked
+Exit cancels pending application callbacks, stops sound playback, destroys the
+Tk window, and signals the camera worker to stop. Camera cleanup releases its
+capture handle and closes its own OpenCV window on normal exit, window close,
+disconnection, and handled OpenCV errors. Missing image or sound files produce
+a path-specific error before entering fullscreen. Rendering/playback failures
+stop the presentation and run cleanup.
 
-**`Ctrl+Alt+Del` still works, though.** Windows treats it as the Secure Attention Sequence (SAS) and handles it at the OS/WinLogon level, below where user-mode hooks like the `keyboard` library operate — it's a Windows security feature specifically meant to stop malware from intercepting that combination. So even though the app blocks `Ctrl`, `Alt`, and `Delete` individually, pressing all three together still brings up the secure desktop / Task Manager screen, and that's your main safety net if you need to bail out.
+The camera runs in a daemon worker so a stalled native webcam driver cannot
+freeze Tk. Shutdown waits at most 0.2 seconds for that worker. Python cannot
+forcibly interrupt a permanently blocked native camera call: if the preview
+stalls, focus the fullscreen overlay and press Esc. In this exceptional case,
+Windows reclaims the camera/window resources when the process exits rather than
+the worker completing its normal cleanup.
 
-Pressing `ESC` only closes the small webcam preview window, not the main BSOD screen.
+## Automated tests
 
-The sequence is designed to end on its own after the final animation, but if you need to stop it immediately:
+From the repository root, using Python 3.11 and a clone containing the baseline
+Git revision above:
 
-* Press `Ctrl+Alt+Del` and open Task Manager from there to end `python.exe`.
-* End the `python.exe` / `Main.py` process from another machine over the network (e.g. `psexec`, SSH, or remote desktop).
-* As a last resort, force a shutdown/restart via the power button.
+```powershell
+python -m unittest discover -s tests -v
+python -m compileall -q src tests
+git diff --check
+```
 
-Because of this, only run the prank on a machine (and with input, like a webcam) you own or have explicit permission to use.
+The tests use Python's standard-library `unittest` runner and mocks; no third-party
+packages are needed to run them. They cover source layout, both import modes,
+all 21 asset hashes, working-directory-independent paths, frame/sound order and
+requested delays, startup/camera handoff, final-frame holding, Esc, timer cleanup,
+camera cleanup and detection behavior, and missing/unavailable resources.
 
-## Disclaimer
+All desktop, GUI, audio, and webcam boundaries are mocked. Automated tests never
+launch the fullscreen simulation, capture real webcam frames, play sounds, send
+real hotkeys, or alter host settings. These checks do not constitute real-hardware
+or live visual testing.
 
-This project is intended for educational, entertainment, and prank purposes only.
+## Use and asset rights
 
-It does **not** damage files, modify the operating system, install malware, or perform any destructive actions.
+This project is for educational, entertainment, and prank purposes. Run it only
+on systems and with camera access you have permission to use. The included
+dramatic images and flashing scare effects are part of the original presentation.
 
-Use responsibly and only on systems where you have permission to run it.
+Some included images, sounds, visual assets, or screenshots may be copyrighted
+by their respective owners. Their inclusion does not establish ownership or
+redistribution rights, and this refactor makes no additional license grant.
+If you hold rights to an asset and want it removed or credited differently,
+please [open an issue](https://github.com/mariospapadimas/fake-bsod-simulator/issues)
+or contact the repository owner. Users must verify the rights needed to
+redistribute assets in forks or other modifications.
 
-## Copyright Notice
-
-Some images, sounds, visual assets, or screenshots included in this repository may be copyrighted by their respective owners.
-
-If you are the copyright holder of any asset used in this project and would like it removed or credited differently, please open an issue or contact the repository owner.
-
-Users are responsible for ensuring they have the rights to distribute any assets included in their forks or modifications of this project.
-
-## License
-
-This project is provided as-is for educational purposes.
+The project is provided as-is for educational purposes. No LICENSE file has been
+added, and asset licensing has not been independently verified.
