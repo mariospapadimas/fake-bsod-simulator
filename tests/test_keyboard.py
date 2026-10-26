@@ -27,10 +27,11 @@ class KeyboardTests(unittest.TestCase):
                     self.assertEqual(self.root.bindings[sequence](
                         SimpleNamespace(keysym=key)), "break")
 
-    def test_control_alt_meta_and_windows_combinations_pass_through(self):
+    def test_modified_key_bindings_allow_native_handlers_to_continue(self):
         for kind in ("KeyPress", "KeyRelease"):
             for modifier in ("Control", "Alt", "Meta", "Mod4"):
-                for key in ("Tab", "F4", "Delete", "Escape", "d"):
+                # Escape has its own, more specific application-exit binding.
+                for key in ("Tab", "F4", "Delete", "d"):
                     with self.subTest(kind=kind, modifier=modifier, key=key):
                         self.assertIsNone(self.root.bindings[f"<{modifier}-{kind}>"](
                             SimpleNamespace(keysym=key)))
