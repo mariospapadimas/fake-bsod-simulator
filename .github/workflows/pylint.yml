@@ -30,7 +30,7 @@ jobs:
       - name: Check Pylint score
         shell: bash
         run: |
-          pylint_output="$(pylint src --score=y 2>&1 || true)"
+          pylint_output="$(pylint src --score=y --extension-pkg-allow-list=cv2 2>&1 || true)"
           printf '%s\n' "$pylint_output"
 
           score="$(printf '%s\n' "$pylint_output" | sed -n 's/.*rated at \(-\{0,1\}[0-9.]\+\)\/10.*/\1/p' | tail -n 1)"
