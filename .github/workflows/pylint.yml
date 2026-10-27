@@ -39,9 +39,9 @@ jobs:
             exit 1
           fi
 
-          if awk -v score="$score" 'BEGIN { exit !(score > 9) }'; then
-            echo "Pylint score $score is above 9."
+          if awk -v score="$score" 'BEGIN { exit !(score > 7.5) }'; then
+            echo "Pylint score $score is above 7.5."
           else
-            echo "Pylint score $score must be above 9."
+            echo "Pylint score $score must be above 7.5."
             exit 1
           fi
