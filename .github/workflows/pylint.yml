@@ -1,0 +1,47 @@
+name: Pylint
+
+on:
+  push:
+    paths:
+      - "**.py"
+      - "requirements.txt"
+      - ".github/workflows/pylint.yml"
+  pull_request:
+    paths:
+      - "**.py"
+      - "requirements.txt"
+      - ".github/workflows/pylint.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pylint:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.11"
+      - name: Install application dependencies and Pylint
+        run: python -m pip install --disable-pip-version-check -r requirements.txt pylint
+      - name: Check Pylint score
+        shell: bash
+        run: |
+          pylint_output="$(pylint src --score=y --generated-members=cv2.* 2>&1 || true)"
+          printf '%s\n' "$pylint_output"
+
+          score="$(printf '%s\n' "$pylint_output" | sed -n 's/.*rated at \(-\{0,1\}[0-9.]\+\)\/10.*/\1/p' | tail -n 1)"
+          if [[ -z "$score" ]]; then
+            echo "Unable to determine the Pylint score."
+            exit 1
+          fi
+
+          if awk -v score="$score" 'BEGIN { exit !(score > 7.5) }'; then
+            echo "Pylint score $score is above 7.5."
+          else
+            echo "Pylint score $score must be above 7.5."
+            exit 1
+          fi
